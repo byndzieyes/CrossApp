@@ -15,10 +15,13 @@ CrossApp/
 └── src/
     ├── Core/
     │   ├── Core.csproj
-    │   └── EnvironmentInfo.cs
+    │   ├── EnvironmentInfo.cs
+    │   ├── Dto/        # майбутнє місце для record-типів (тиждень 3)
+    │   ├── Domain/     # сутності з поведінкою та інваріантами (тиждень 4)
+    │   └── Storage/    # реалізації сховищ (тиждень 5)
     └── Cli/
-        ├── Cli.csproj
-        └── Program.cs
+        ├── Cli.csproj  # містить ProjectReference на Core
+        └── Program.cs  # лише форматування виводу, без бізнес-логіки
 ```
 
 - **`Core`** (`classlib`): центральна бібліотека логіки, яка не залежить від інтерфейсу користувача чи платформи виводу.
@@ -73,10 +76,11 @@ dotnet publish src/Cli -c Release -r win-x64 --self-contained true -o publish/wi
 
 ## Порівняння режимів публікації
 
-| RID       | Режим               | Розмір publish | Потрібен встановлений runtime |
-| :-------- | :------------------ | :------------- | :---------------------------- |
-| `win-x64` | self-contained      | ~76.67 МБ      | Ні                            |
-| `win-x64` | framework-dependent | ~0.19 МБ       | Так (.NET 10)                 |
+| RID         | Режим               | Розмір publish | Потрібен встановлений runtime |
+| :---------- | :------------------ | :------------- | :---------------------------- |
+| `win-x64`   | self-contained      | ~76.67 МБ      | Ні                            |
+| `win-x64`   | framework-dependent | ~0.19 МБ       | Так (.NET 10)                 |
+| `linux-x64` | self-contained      | ~78.80 МБ      | Ні                            |
 
 ### Різниця режимів
 
