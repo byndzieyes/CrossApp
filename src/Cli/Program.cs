@@ -11,7 +11,20 @@ if (!File.Exists(path))
     return 1;
 }
 
-ImportResult<ProductDto> result = ProductCsvImporter.Load(path);
+string extension = Path.GetExtension(path).ToLowerInvariant();
+
+if (extension is not ".csv" and not ".json")
+{
+    Console.WriteLine($"Непідтримуваний формат файлу: {extension}");
+    return 1;
+}
+
+ImportResult<ProductDto> result = extension switch
+{
+    ".csv" => ProductCsvImporter.Load(path),
+    ".json" => ProductJsonImporter.Load(path),
+    _ => throw new InvalidOperationException()
+};
 
 Console.WriteLine($"Завантажено записів: {result.Items.Count}");
 
@@ -27,8 +40,12 @@ foreach (ProductDto product in result.Items.Take(5))
 
 if (result.Errors.Count > 0)
 {
+    string skippedLabel = extension == ".json"
+        ? "Пропущено елементів"
+        : "Пропущено рядків";
+
     Console.WriteLine();
-    Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
+    Console.WriteLine($"{skippedLabel}: {result.Errors.Count}");
 
     foreach (string error in result.Errors)
     {

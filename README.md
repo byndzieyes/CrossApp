@@ -23,7 +23,8 @@ CrossApp/
     │   │   ├── WarehouseDto.cs
     │   │   └── ImportResult.cs
     │   ├── Import/
-    │   │   └── ProductCsvImporter.cs
+    │   │   ├── ProductCsvImporter.cs
+    │   │   └── ProductJsonImporter.cs
     └── Cli/
         ├── Cli.csproj  # містить ProjectReference на Core
         └── Program.cs  # лише форматування виводу, без бізнес-логіки
@@ -175,3 +176,14 @@ P-002;SKU-002;Пісок будівельний;т;18
   ! рядок 13: кількість 'багато' не є невід'ємним цілим числом
   ! рядок 14: ідентифікатор, SKU, назва або одиниця вимірювання порожні
 ```
+
+### Додатково: імпорт JSON
+
+Для тих самих `ProductDto` реалізовано `ProductJsonImporter` на основі `System.Text.Json`. Консольний застосунок обирає імпортер за розширенням файлу:
+
+```bash
+dotnet run --project src/Cli -- data/sample.csv
+dotnet run --project src/Cli -- data/sample.json
+```
+
+Назви JSON-властивостей зіставляються без урахування регістру. Елементи масиву обробляються окремо: записи з порожніми обов’язковими полями, від’ємною кількістю або невідповідними типами потрапляють до `Errors`, а інші залишаються в `Items`. Синтаксично зламаний JSON повертається як помилка всього документа.
