@@ -40,6 +40,16 @@ public static class ProductJsonImporter
                     continue;
                 }
 
+                string? missingProperty = FindMissingRequiredProperty(element);
+
+                if (missingProperty is not null)
+                {
+                    errors.Add(
+                        $"елемент {elementNumber}: " +
+                        $"відсутнє обов'язкове поле '{missingProperty}'");
+                    continue;
+                }
+
                 try
                 {
                     ProductDto? product = element.Deserialize<ProductDto>(Options);
@@ -90,4 +100,25 @@ public static class ProductJsonImporter
         { Quantity: < 0 } => "кількість не може бути від'ємною",
         _ => null
     };
+
+    private static string? FindMissingRequiredProperty(JsonElement element)
+    {
+        string[] requiredProperties = ["id", "sku", "name", "unit", "quantity"];
+
+        foreach (string requiredProperty in requiredProperties)
+        {
+            bool exists = element
+                .EnumerateObject()
+                .Any(property => property.Name.Equals(
+                    requiredProperty,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (!exists)
+            {
+                return requiredProperty;
+            }
+        }
+
+        return null;
+    }
 }

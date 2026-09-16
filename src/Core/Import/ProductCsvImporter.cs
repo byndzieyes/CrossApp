@@ -13,6 +13,7 @@ public static class ProductCsvImporter
         var errors = new List<string>();
 
         string[] lines = File.ReadAllLines(path, Encoding.UTF8);
+        bool isFirstContentLine = true;
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -24,11 +25,14 @@ public static class ProductCsvImporter
                 continue;
             }
 
-            if (lineNumber == 1 &&
+            if (isFirstContentLine &&
                 line.StartsWith("id", StringComparison.OrdinalIgnoreCase))
             {
+                isFirstContentLine = false;
                 continue;
             }
+
+            isFirstContentLine = false;
 
             switch (ParseLine(line))
             {

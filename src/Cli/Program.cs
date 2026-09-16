@@ -58,6 +58,8 @@ if (result.Errors.Count > 0)
     }
 }
 
+PrintStatistics(result);
+
 return 0;
 
 static int RunMixedImport(string path)
@@ -96,5 +98,24 @@ static int RunMixedImport(string path)
         }
     }
 
+    PrintStatistics(result);
+
     return 0;
+}
+
+static void PrintStatistics<T>(ImportResult<T> result)
+{
+    int accepted = result.Items.Count;
+    int skipped = result.Errors.Count;
+    int total = accepted + skipped;
+    double errorPercentage = total == 0
+        ? 0
+        : skipped * 100.0 / total;
+
+    Console.WriteLine();
+    Console.WriteLine(
+        $"Статистика: усього {total}, " +
+        $"прийнято {accepted}, " +
+        $"пропущено {skipped}, " +
+        $"помилок {errorPercentage:F1}%");
 }
