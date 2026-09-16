@@ -21,10 +21,12 @@ CrossApp/
     │   ├── Dto/
     │   │   ├── ProductDto.cs
     │   │   ├── WarehouseDto.cs
+    │   │   ├── WarehouseEntryDto.cs
     │   │   └── ImportResult.cs
     │   ├── Import/
     │   │   ├── ProductCsvImporter.cs
-    │   │   └── ProductJsonImporter.cs
+    │   │   ├── ProductJsonImporter.cs
+    │   │   └── MixedWarehouseCsvImporter.cs
     └── Cli/
         ├── Cli.csproj  # містить ProjectReference на Core
         └── Program.cs  # лише форматування виводу, без бізнес-логіки
@@ -177,7 +179,7 @@ P-002;SKU-002;Пісок будівельний;т;18
   ! рядок 14: ідентифікатор, SKU, назва або одиниця вимірювання порожні
 ```
 
-### Додатково: імпорт JSON
+### Додаткове завдання 1: імпорт JSON
 
 Для тих самих `ProductDto` реалізовано `ProductJsonImporter` на основі `System.Text.Json`. Консольний застосунок обирає імпортер за розширенням файлу:
 
@@ -187,3 +189,20 @@ dotnet run --project src/Cli -- data/sample.json
 ```
 
 Назви JSON-властивостей зіставляються без урахування регістру. Елементи масиву обробляються окремо: записи з порожніми обов’язковими полями, від’ємною кількістю або невідповідними типами потрапляють до `Errors`, а інші залишаються в `Items`. Синтаксично зламаний JSON повертається як помилка всього документа.
+
+### Додаткове завдання 2: різнорідні рядки CSV
+
+Файли з суфіксом `.mixed.csv` можуть містити товари та склади. Префікс рядка визначає тип запису:
+
+```text
+P;id;sku;name;unit;quantity
+W;id;name;location
+```
+
+Запуск:
+
+```bash
+dotnet run --project src/Cli -- data/sample.mixed.csv
+```
+
+`MixedWarehouseCsvImporter` використовує один `switch expression` з list patterns для розпізнавання обох форматів. Правильні рядки повертають `ProductDto` або `WarehouseDto` через спільний базовий тип `WarehouseEntryDto`.

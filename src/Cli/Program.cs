@@ -19,6 +19,11 @@ if (extension is not ".csv" and not ".json")
     return 1;
 }
 
+if (path.EndsWith(".mixed.csv", StringComparison.OrdinalIgnoreCase))
+{
+    return RunMixedImport(path);
+}
+
 ImportResult<ProductDto> result = extension switch
 {
     ".csv" => ProductCsvImporter.Load(path),
@@ -54,3 +59,42 @@ if (result.Errors.Count > 0)
 }
 
 return 0;
+
+static int RunMixedImport(string path)
+{
+    ImportResult<WarehouseEntryDto> result =
+        MixedWarehouseCsvImporter.Load(path);
+
+    Console.WriteLine($"Завантажено записів: {result.Items.Count}");
+
+    foreach (WarehouseEntryDto item in result.Items)
+    {
+        string output = item switch
+        {
+            ProductDto product =>
+                $"  [товар] {product.Id,-6} {product.Sku,-10} " +
+                $"{product.Name,-30} {product.Quantity,6} {product.Unit}",
+
+            WarehouseDto warehouse =>
+                $"  [склад] {warehouse.Id,-6} " +
+                $"{warehouse.Name,-25} {warehouse.Location}",
+
+            _ => "  [невідомий запис]"
+        };
+
+        Console.WriteLine(output);
+    }
+
+    if (result.Errors.Count > 0)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Пропущено рядків: {result.Errors.Count}");
+
+        foreach (string error in result.Errors)
+        {
+            Console.WriteLine($"  ! {error}");
+        }
+    }
+
+    return 0;
+}
