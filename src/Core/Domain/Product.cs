@@ -1,3 +1,5 @@
+using Core.Dto;
+
 namespace Core.Domain;
 
 public sealed class Product
@@ -58,5 +60,40 @@ public sealed class Product
             unit.Trim(),
             quantity,
             note);
+    }
+
+    public void RegisterArrival(int amount)
+    {
+        if (amount <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(amount), amount, "Кількість приходу має бути більшою за нуль");
+
+        if (amount > int.MaxValue - _quantity)
+            throw new InvalidOperationException(
+                $"Не можна додати {amount} одиниць товару {Sku}: залишок перевищить допустиме значення");
+
+        _quantity += amount;
+    }
+
+    public void Issue(int amount)
+    {
+        if (amount <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(amount), amount, "Кількість видачі має бути більшою за нуль");
+
+        if (amount > _quantity)
+            throw new InvalidOperationException(
+                $"Не можна видати {amount} одиниць товару {Sku}: залишок становить {_quantity}");
+
+        _quantity -= amount;
+    }
+
+    public ProductDto ToDto() => new(Id, Sku, Name, Unit, Quantity, Note);
+
+    public static Product FromDto(ProductDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+
+        return Create(dto.Id, dto.Sku, dto.Name, dto.Unit, dto.Quantity, dto.Note);
     }
 }
