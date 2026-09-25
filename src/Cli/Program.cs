@@ -103,6 +103,33 @@ static void RunDomainDemo()
     Console.WriteLine(
         $"Залишок після відмов: {product.Quantity} {product.Unit} " +
         $"(до них: {quantityBeforeFailures} {product.Unit})");
+
+    Console.WriteLine();
+    Console.WriteLine("=== Сценарій 3: DTO → доменні товари ===");
+
+    var imported = new ImportResult<ProductDto>(
+        [
+            new ProductDto("P-010", "sku-010", "Пісок", "т", 15),
+            new ProductDto("P-011", "sku-011", "Цегла", "шт", -3),
+            new ProductDto("P-012", "sku-012", "Щебінь", "т", 8)
+        ],
+        ["рядок 7: кількість 'багато' не є цілим числом"]);
+
+    ImportResult<Product> converted = ProductDomainConverter.Convert(imported);
+    Console.WriteLine($"DTO на вході: {imported.Items.Count}");
+    Console.WriteLine($"Доменних товарів: {converted.Items.Count}");
+
+    foreach (Product accepted in converted.Items)
+    {
+        Console.WriteLine($"  + {accepted.Id}: {accepted.Sku}, {accepted.Quantity} {accepted.Unit}");
+    }
+
+    Console.WriteLine($"Помилок (імпорт + домен): {converted.Errors.Count}");
+
+    foreach (string error in converted.Errors)
+    {
+        Console.WriteLine($"  ! {error}");
+    }
 }
 
 static void TryDo(string title, Action action)
