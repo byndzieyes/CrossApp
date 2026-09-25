@@ -130,6 +130,29 @@ static void RunDomainDemo()
     {
         Console.WriteLine($"  ! {error}");
     }
+
+    Console.WriteLine();
+    Console.WriteLine("=== Сценарій 4: правило для товару та складу ===");
+
+    var warehouse = Warehouse.Create("W-001", "Основний склад", "шт", 10);
+    var warehouseProduct = Product.Create("P-020", "sku-020", "Болт", "шт", 0);
+    var receiving = new WarehouseReceivingService();
+
+    receiving.Receive(warehouse, warehouseProduct, 6);
+    Console.WriteLine(
+        $"Після надходження 6: товар {warehouseProduct.Quantity} {warehouseProduct.Unit}, " +
+        $"на складі зайнято {warehouse.OccupiedCapacity} із {warehouse.Capacity} {warehouse.Unit}");
+
+    TryDo("надходження понад місткість", () =>
+        receiving.Receive(warehouse, warehouseProduct, 5));
+
+    var otherUnitProduct = Product.Create("P-021", "sku-021", "Пісок", "т", 0);
+    TryDo("невідповідна одиниця", () =>
+        receiving.Receive(warehouse, otherUnitProduct, 1));
+
+    Console.WriteLine(
+        $"Після відмов: товар {warehouseProduct.Quantity} {warehouseProduct.Unit}, " +
+        $"на складі зайнято {warehouse.OccupiedCapacity} із {warehouse.Capacity} {warehouse.Unit}");
 }
 
 static void TryDo(string title, Action action)
