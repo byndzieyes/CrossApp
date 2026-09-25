@@ -153,6 +153,24 @@ static void RunDomainDemo()
     Console.WriteLine(
         $"Після відмов: товар {warehouseProduct.Quantity} {warehouseProduct.Unit}, " +
         $"на складі зайнято {warehouse.OccupiedCapacity} із {warehouse.Capacity} {warehouse.Unit}");
+
+    Console.WriteLine();
+    Console.WriteLine("=== Сценарій 5: стани замовлення ===");
+
+    Order confirmedOrder = Order.Create("O-001");
+    Console.WriteLine($"{confirmedOrder.Id}: {confirmedOrder.Status}");
+    confirmedOrder.ChangeStatus(OrderStatus.Confirmed);
+    Console.WriteLine($"Після підтвердження: {confirmedOrder.Status}");
+    TryDo("скасування підтвердженого замовлення", () =>
+        confirmedOrder.ChangeStatus(OrderStatus.Cancelled));
+    Console.WriteLine($"Стан після відмови: {confirmedOrder.Status}");
+
+    Order cancelledOrder = Order.Create("O-002");
+    cancelledOrder.ChangeStatus(OrderStatus.Cancelled);
+    Console.WriteLine($"{cancelledOrder.Id} після скасування: {cancelledOrder.Status}");
+    TryDo("підтвердження скасованого замовлення", () =>
+        cancelledOrder.ChangeStatus(OrderStatus.Confirmed));
+    Console.WriteLine($"Стан після відмови: {cancelledOrder.Status}");
 }
 
 static void TryDo(string title, Action action)
