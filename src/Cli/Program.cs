@@ -1,4 +1,4 @@
-﻿using Core.Dto;
+using Core.Dto;
 using Core.Import;
 using Core.Domain;
 using Core;
@@ -7,7 +7,7 @@ using Core.Services;
 using Core.Storage;
 using System.Text.Json;
 
-if (args.Length == 0 || (args.Length == 1 && args[0] == "--file"))
+if (args.All(arg => arg is "--file" or "--cache") && args.Distinct().Count() == args.Length)
 {
     // Composition root: тут обираємо реалізацію та передаємо її сервісу вручну.
     bool useFile = args.Contains("--file");
@@ -15,11 +15,16 @@ if (args.Length == 0 || (args.Length == 1 && args[0] == "--file"))
     ICatalogStore store = useFile
         ? new FileCatalogStore(dataPath)
         : new InMemoryCatalogStore(SampleData.Products());
+    if (args.Contains("--cache"))
+        store = new CachingCatalogStore(store);
     var service = new CatalogService(store);
 
     try
     {
-        RunCatalogDemo(service, store.GetType().Name, useFile ? dataPath : null);
+        string storeName = args.Contains("--cache")
+            ? $"CachingCatalogStore → {(useFile ? "FileCatalogStore" : "InMemoryCatalogStore")}"
+            : store.GetType().Name;
+        RunCatalogDemo(service, storeName, useFile ? dataPath : null);
         return 0;
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
@@ -32,7 +37,7 @@ if (args.Length == 0 || (args.Length == 1 && args[0] == "--file"))
 
 if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
 {
-    Console.WriteLine("Використання: без аргументів | --file | --demo-domain | шлях до CSV/JSON");
+    Console.WriteLine("Використання: [--file] [--cache] | --demo-domain | шлях до CSV/JSON");
     return 1;
 }
 
