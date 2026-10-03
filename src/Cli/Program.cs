@@ -1,22 +1,16 @@
 using Core.Dto;
 using Core.Import;
 using Core.Domain;
-using Core;
 using Core.Abstractions;
 using Core.Services;
-using Core.Storage;
+using Cli;
 using System.Text.Json;
 
-if (args.All(arg => arg is "--file" or "--cache") && args.Distinct().Count() == args.Length)
+if (StoreFactory.IsCatalogMode(args))
 {
-    // Composition root: тут обираємо реалізацію та передаємо її сервісу вручну.
+    // Composition root: фабрика створює сховище, а тут з’єднуємо його із сервісом.
     bool useFile = args.Contains("--file");
-    string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "catalog.json");
-    ICatalogStore store = useFile
-        ? new FileCatalogStore(dataPath)
-        : new InMemoryCatalogStore(SampleData.Products());
-    if (args.Contains("--cache"))
-        store = new CachingCatalogStore(store);
+    ICatalogStore store = StoreFactory.Create(args);
     var service = new CatalogService(store);
 
     try
@@ -24,7 +18,7 @@ if (args.All(arg => arg is "--file" or "--cache") && args.Distinct().Count() == 
         string storeName = args.Contains("--cache")
             ? $"CachingCatalogStore → {(useFile ? "FileCatalogStore" : "InMemoryCatalogStore")}"
             : store.GetType().Name;
-        RunCatalogDemo(service, storeName, useFile ? dataPath : null);
+        RunCatalogDemo(service, storeName, useFile ? StoreFactory.DataPath : null);
         return 0;
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
