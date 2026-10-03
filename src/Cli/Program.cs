@@ -129,6 +129,15 @@ static void RunCatalogDemo(CatalogService service, string storeName, string? dat
         Console.WriteLine($"  {product.Id,-32} {product.Sku,-10} {product.Name,-24} {product.Quantity,6} {product.Unit}");
     Console.WriteLine($"Записів після додавання: {service.All().Count}");
 
+    IReadOnlyList<Product> lowStock = service.Search(product => product.Quantity < 10);
+    Console.WriteLine($"Пошук: товарів із залишком менше 10 — {lowStock.Count}");
+    foreach (Product product in lowStock)
+        Console.WriteLine($"  {product.Sku}: {product.Name}, {product.Quantity} {product.Unit}");
+
+    IReadOnlyList<Product> cables = service.Search(product =>
+        product.Unit == "м" && product.Name.Contains("Кабель", StringComparison.OrdinalIgnoreCase));
+    Console.WriteLine($"Пошук: кабелів в одиницях «м» — {cables.Count}");
+
     Console.WriteLine("Сценарій відмови:");
     try
     {
