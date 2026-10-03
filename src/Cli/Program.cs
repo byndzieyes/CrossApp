@@ -1,6 +1,40 @@
 ﻿using Core.Dto;
 using Core.Import;
 using Core.Domain;
+using Core;
+using Core.Abstractions;
+using Core.Services;
+using Core.Storage;
+using System.Text.Json;
+
+if (args.Length == 0 || (args.Length == 1 && args[0] == "--file"))
+{
+    // Composition root: тут обираємо реалізацію та передаємо її сервісу вручну.
+    bool useFile = args.Contains("--file");
+    string dataPath = Path.Combine(AppContext.BaseDirectory, "data", "catalog.json");
+    ICatalogStore store = useFile
+        ? new FileCatalogStore(dataPath)
+        : new InMemoryCatalogStore(SampleData.Products());
+    var service = new CatalogService(store);
+
+    try
+    {
+        RunCatalogDemo(service, store.GetType().Name, useFile ? dataPath : null);
+        return 0;
+    }
+    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+        or JsonException or ArgumentException or InvalidOperationException)
+    {
+        Console.WriteLine($"Не вдалося виконати операцію каталогу: {exception.Message}");
+        return 1;
+    }
+}
+
+if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
+{
+    Console.WriteLine("Використання: без аргументів | --file | --demo-domain | шлях до CSV/JSON");
+    return 1;
+}
 
 if (args.Length == 1 &&
     args[0].Equals("--demo-domain", StringComparison.OrdinalIgnoreCase))
@@ -69,6 +103,37 @@ if (result.Errors.Count > 0)
 PrintStatistics(result);
 
 return 0;
+
+static void RunCatalogDemo(CatalogService service, string storeName, string? dataPath)
+{
+    Console.WriteLine($"Сховище: {storeName}");
+    if (dataPath is not null)
+        Console.WriteLine($"Файл даних: {dataPath}");
+    Console.WriteLine($"Записів до додавання: {service.All().Count}");
+
+    Product created = service.Add("SKU-101", "Кабель UTP cat6", "м", 50);
+    Console.WriteLine($"Додано {created.Id}: {created.Quantity} {created.Unit}");
+    service.Receive(created.Id, 25);
+    service.Issue(created.Id, 10);
+    Console.WriteLine($"Після приходу 25 і видачі 10: {created.Quantity} {created.Unit}");
+
+    Product? found = service.Find(created.Id);
+    Console.WriteLine($"Пошук за id: {found?.Name}, залишок {found?.Quantity}");
+    Console.WriteLine("Товари:");
+    foreach (Product product in service.All())
+        Console.WriteLine($"  {product.Id,-32} {product.Sku,-10} {product.Name,-24} {product.Quantity,6} {product.Unit}");
+    Console.WriteLine($"Записів після додавання: {service.All().Count}");
+
+    Console.WriteLine("Сценарій відмови:");
+    try
+    {
+        service.Receive("missing-id", 1);
+    }
+    catch (InvalidOperationException exception)
+    {
+        Console.WriteLine($"  Помилка: {exception.Message}");
+    }
+}
 
 static void RunDomainDemo()
 {
