@@ -1,6 +1,7 @@
 using Core.Dto;
 using Core.Import;
 using Core.Domain;
+using Core.Events;
 using Core.Abstractions;
 using Core.Services;
 using Cli;
@@ -105,6 +106,28 @@ return 0;
 
 static void RunCatalogDemo(CatalogService service, string storeName, string? dataPath)
 {
+    string logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+
+    void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+    {
+        string line = $"{e.At:HH:mm:ss} {e.Kind,-8} {e.Id} {e.Delta,4:+0;-0} → залишок {e.QuantityAfter}";
+        Console.WriteLine(line);
+        try
+        {
+            File.AppendAllText(logPath, line + Environment.NewLine);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"Не вдалося записати подію у файл: {exception.Message}");
+        }
+    }
+
+    service.Changed += OnCatalogChanged;
+
+    int changes = 0;
+    service.Changed += (_, _) => changes++;
+
     Console.WriteLine($"Сховище: {storeName}");
     if (dataPath is not null)
         Console.WriteLine($"Файл даних: {dataPath}");
@@ -115,6 +138,24 @@ static void RunCatalogDemo(CatalogService service, string storeName, string? dat
     service.Receive(created.Id, 25);
     service.Issue(created.Id, 10);
     Console.WriteLine($"Після приходу 25 і видачі 10: {created.Quantity} {created.Unit}");
+    Console.WriteLine($"Подій отримано: {changes}");
+
+    service.Changed -= OnCatalogChanged;
+    service.Receive(created.Id, 5);
+    Console.WriteLine($"Після відписки залишок: {created.Quantity} {created.Unit}");
+    Console.WriteLine($"Подій отримано: {changes}");
+
+    Console.WriteLine("Сценарій відмови (подія не виникає):");
+    int changesBeforeFailure = changes;
+    try
+    {
+        service.Receive(created.Id, -1);
+    }
+    catch (ArgumentOutOfRangeException exception)
+    {
+        Console.WriteLine($"  Помилка: {exception.Message}");
+    }
+    Console.WriteLine($"Лічильник після відмови: {changes} (до відмови: {changesBeforeFailure})");
 
     Product? found = service.Find(created.Id);
     Console.WriteLine($"Пошук за id: {found?.Name}, залишок {found?.Quantity}");
@@ -124,7 +165,7 @@ static void RunCatalogDemo(CatalogService service, string storeName, string? dat
     Console.WriteLine($"Записів після додавання: {service.All().Count}");
 
     IReadOnlyList<Product> lowStock = service.Search(product => product.Quantity < 10);
-    Console.WriteLine($"Пошук: товарів із залишком менше 10 — {lowStock.Count}");
+    Console.WriteLine($"Пошук Func: товарів із залишком менше 10 — {lowStock.Count}");
     foreach (Product product in lowStock)
         Console.WriteLine($"  {product.Sku}: {product.Name}, {product.Quantity} {product.Unit}");
 
@@ -132,15 +173,6 @@ static void RunCatalogDemo(CatalogService service, string storeName, string? dat
         product.Unit == "м" && product.Name.Contains("Кабель", StringComparison.OrdinalIgnoreCase));
     Console.WriteLine($"Пошук: кабелів в одиницях «м» — {cables.Count}");
 
-    Console.WriteLine("Сценарій відмови:");
-    try
-    {
-        service.Receive("missing-id", 1);
-    }
-    catch (InvalidOperationException exception)
-    {
-        Console.WriteLine($"  Помилка: {exception.Message}");
-    }
 }
 
 static void RunDomainDemo()

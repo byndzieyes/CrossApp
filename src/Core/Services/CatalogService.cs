@@ -1,5 +1,6 @@
 using Core.Abstractions;
 using Core.Domain;
+using Core.Events;
 
 namespace Core.Services;
 
@@ -7,10 +8,17 @@ public sealed class CatalogService(ICatalogStore store)
 {
     private readonly ICatalogStore _store = store ?? throw new ArgumentNullException(nameof(store));
 
+    public event EventHandler<CatalogChangedEventArgs>? Changed;
+
+    private void OnChanged(Product product, CatalogChangeKind kind, int delta) =>
+        Changed?.Invoke(this, new CatalogChangedEventArgs(
+            product.Id, kind, delta, product.Quantity));
+
     public Product Add(string sku, string name, string unit, int quantity, string? note = null)
     {
         var product = Product.Create(Guid.NewGuid().ToString("N"), sku, name, unit, quantity, note);
         _store.Add(product);
+        OnChanged(product, CatalogChangeKind.Added, quantity);
         return product;
     }
 
@@ -19,6 +27,7 @@ public sealed class CatalogService(ICatalogStore store)
         Product product = RequireProduct(id);
         product.RegisterArrival(quantity);
         _store.Update(product);
+        OnChanged(product, CatalogChangeKind.Received, quantity);
     }
 
     public void Issue(string id, int quantity)
@@ -26,6 +35,7 @@ public sealed class CatalogService(ICatalogStore store)
         Product product = RequireProduct(id);
         product.Issue(quantity);
         _store.Update(product);
+        OnChanged(product, CatalogChangeKind.Issued, -quantity);
     }
 
     public IReadOnlyList<Product> All() => _store.List();
