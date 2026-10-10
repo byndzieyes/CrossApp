@@ -5,7 +5,28 @@ using Core.Events;
 using Core.Abstractions;
 using Core.Services;
 using Cli;
+using Cli.Notifications;
 using System.Text.Json;
+
+if (args.Length == 1 && args[0] == "--demo-sinks")
+{
+    try
+    {
+        ICatalogStore store = StoreFactory.Create([]);
+        string logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app-sinks.log");
+        INotificationSink[] sinks = [new ConsoleSink(), new FileSink(logPath)];
+        var service = new CatalogService(store, sinks);
+
+        RunCatalogSinkDemo(service, logPath);
+        return 0;
+    }
+    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+        or ArgumentException or InvalidOperationException)
+    {
+        Console.WriteLine($"Не вдалося виконати демо з INotificationSink: {exception.Message}");
+        return 1;
+    }
+}
 
 if (StoreFactory.IsCatalogMode(args))
 {
@@ -32,7 +53,7 @@ if (StoreFactory.IsCatalogMode(args))
 
 if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
 {
-    Console.WriteLine("Використання: [--file] [--cache] | --demo-domain | шлях до CSV/JSON");
+    Console.WriteLine("Використання: [--file] [--cache] | --demo-domain | --demo-sinks | шлях до CSV/JSON");
     return 1;
 }
 
@@ -173,6 +194,18 @@ static void RunCatalogDemo(CatalogService service, string storeName, string? dat
         product.Unit == "м" && product.Name.Contains("Кабель", StringComparison.OrdinalIgnoreCase));
     Console.WriteLine($"Пошук: кабелів в одиницях «м» — {cables.Count}");
 
+}
+
+static void RunCatalogSinkDemo(CatalogService service, string logPath)
+{
+    Console.WriteLine("Демо INotificationSink (залежності передані через конструктор)");
+    Console.WriteLine($"Файл журналу: {logPath}");
+
+    Product created = service.Add("SKU-SINK", "Демонстраційний кабель", "м", 20);
+    service.Receive(created.Id, 5);
+    service.Issue(created.Id, 3);
+
+    Console.WriteLine($"Кінцевий залишок: {created.Quantity} {created.Unit}");
 }
 
 static void RunDomainDemo()
