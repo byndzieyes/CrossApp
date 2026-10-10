@@ -87,9 +87,11 @@ if (path.EndsWith(".mixed.csv", StringComparison.OrdinalIgnoreCase))
     return RunMixedImport(path);
 }
 
+Action<string> reportSkipped = message => Console.WriteLine($"  ! {message}");
+
 ImportResult<ProductDto> result = extension switch
 {
-    ".csv" => ProductCsvImporter.Load(path),
+    ".csv" => ProductCsvImporter.Load(path, reportSkipped),
     ".json" => ProductJsonImporter.Load(path),
     _ => throw new InvalidOperationException()
 };
@@ -115,9 +117,12 @@ if (result.Errors.Count > 0)
     Console.WriteLine();
     Console.WriteLine($"{skippedLabel}: {result.Errors.Count}");
 
-    foreach (string error in result.Errors)
+    if (extension != ".csv")
     {
-        Console.WriteLine($"  ! {error}");
+        foreach (string error in result.Errors)
+        {
+            Console.WriteLine($"  ! {error}");
+        }
     }
 }
 
