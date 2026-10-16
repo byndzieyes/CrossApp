@@ -10,6 +10,22 @@ using Cli;
 using Cli.Notifications;
 using System.Text.Json;
 
+if (args.Length == 1 && args[0] == "report-benchmark")
+{
+    var benchmark = ReportBenchmark.Run();
+    Console.WriteLine($"Записів: {benchmark.SourceCount}; рядків звіту: {benchmark.ResultCount}");
+    Console.WriteLine("Прогрів: 3 пари запусків; результати обох варіантів перевірено.");
+    Console.WriteLine($"{"Повтор",8} {"Без проміжного ToList, мс",27} {"З проміжним ToList, мс",25}");
+    for (int i = 0; i < benchmark.Samples.Count; i++)
+    {
+        var sample = benchmark.Samples[i];
+        Console.WriteLine($"{i + 1,8} {sample.WithoutIntermediateListMs,27:F3} {sample.WithIntermediateListMs,25:F3}");
+    }
+    Console.WriteLine($"Медіана: без ToList {benchmark.WithoutIntermediateListMedianMs:F3} мс; " +
+        $"із ToList {benchmark.WithIntermediateListMedianMs:F3} мс.");
+    return 0;
+}
+
 if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("report-", StringComparison.Ordinal)))
 {
     try
@@ -59,7 +75,7 @@ if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("re
                 Console.WriteLine($"У знімку лишилось: {demo.Snapshot}");
                 break;
             default:
-                Console.WriteLine("Команди: report-top | report-low | report-groups | report-sum | report-demo | report-movements | report-movements-top");
+                Console.WriteLine("Команди: report-top | report-low | report-groups | report-sum | report-demo | report-movements | report-movements-top | report-benchmark");
                 return 1;
         }
         return 0;
@@ -118,7 +134,7 @@ if (Array.Exists(args, a => a == "--demo-catalog"))
 
 if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
 {
-    Console.WriteLine("Використання: [report-top|report-low|report-groups|report-sum|report-demo|report-movements|report-movements-top] [--file] [--cache]");
+    Console.WriteLine("Використання: [report-top|report-low|report-groups|report-sum|report-demo|report-movements|report-movements-top|report-benchmark] [--file] [--cache]");
     Console.WriteLine("Або: --demo-catalog [--file] [--cache] | --demo-domain | --demo-sinks | шлях до CSV/JSON");
     return 1;
 }
