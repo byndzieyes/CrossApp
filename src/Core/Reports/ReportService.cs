@@ -38,12 +38,18 @@ public static class ReportService
             .TopBy(line => line.MovementCount, n, line => line.Sku)
             .ToList();
 
-    public static IReadOnlyList<GroupSummary> ByUnit(IEnumerable<Product> source) =>
-        source.GroupBy(p => p.Unit, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new GroupSummary(g.Key, g.Count(), g.Sum(p => p.Quantity)))
-            .OrderByDescending(g => g.TotalQuantity)
+    public static IReadOnlyList<GroupSummary> ByUnit(IEnumerable<Product> source)
+    {
+        var query =
+            from g in source.GroupBy(p => p.Unit, StringComparer.OrdinalIgnoreCase)
+            select new GroupSummary(g.Key, g.Count(), g.Sum(p => p.Quantity)) into summary
+            orderby summary.TotalQuantity descending
+            select summary;
+
+        return query
             .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     public static (int Items, int Total, double Average, int Max) Totals(IEnumerable<Product> source)
     {

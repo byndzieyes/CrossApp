@@ -260,7 +260,7 @@ dotnet run --project src/Cli -- --demo-catalog --file --cache
 
 ## Лабораторна 7 — звіти через LINQ
 
-Реалізовано основне завдання та додаткові 1 (GroupJoin) і 2 (метод розширення TopBy). `Core/Reports/ReportService` приймає `IEnumerable<Product>` і формує готові списки DTO `StockLine` та `GroupSummary`; `Totals` повертає іменований кортеж згідно з прикладом методички. Core не залежить від Console; у Program.cs немає Where/GroupBy. Використовується лише LINQ to Objects.
+Реалізовано основне завдання та додаткові 1 (GroupJoin), 2 (метод розширення TopBy) і 3 (синтаксис запитів). `Core/Reports/ReportService` приймає `IEnumerable<Product>` і формує готові списки DTO `StockLine` та `GroupSummary`; `Totals` повертає іменований кортеж згідно з прикладом методички. Core не залежить від Console; у Program.cs немає Where/GroupBy. Використовується лише LINQ to Objects.
 
 Команди виконуються з каталогу CrossApp:
 
@@ -301,9 +301,36 @@ dotnet run --project src/Cli -- report-movements
 dotnet run --project src/Cli -- report-movements-top
 ```
 
-На демонстраційних даних порядок топ-5: SKU-001 (3 рухи), SKU-008 (2), SKU-002 (1), SKU-005 (1), SKU-003 (0). TopBy працює і з Product, і з MovementSummary: тип T визначається з джерела. Додаткові завдання 3 і 4 не виконувалися.
+На демонстраційних даних порядок топ-5: SKU-001 (3 рухи), SKU-008 (2), SKU-002 (1), SKU-005 (1), SKU-003 (0). TopBy працює і з Product, і з MovementSummary: тип T визначається з джерела.
+
+### Додаткове завдання 3 — синтаксис запитів
+
+Звіт `ByUnit`, який запускається через `report-groups`, переписано з використанням синтаксису запитів:
+
+```csharp
+var query =
+    from g in source.GroupBy(p => p.Unit, StringComparer.OrdinalIgnoreCase)
+    select new GroupSummary(g.Key, g.Count(), g.Sum(p => p.Quantity)) into summary
+    orderby summary.TotalQuantity descending
+    select summary;
+
+return query.ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ToList();
+```
+
+Еквівалентний попередній запис ланцюжком методів:
+
+```csharp
+return source.GroupBy(p => p.Unit, StringComparer.OrdinalIgnoreCase)
+    .Select(g => new GroupSummary(g.Key, g.Count(), g.Sum(p => p.Quantity)))
+    .OrderByDescending(g => g.TotalQuantity)
+    .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+    .ToList();
+```
+
+`from` задає перебір груп, `select ... into summary` проєктує групу в DTO і продовжує запит уже над DTO, `orderby ... descending` сортує підсумки за спаданням. Компілятор перетворює ці конструкції на стандартні виклики Select та OrderByDescending; це не SQL і не інший механізм виконання.
+
+Запис запитом виразніше називає проміжний результат summary та відокремлює проєкцію від сортування. Ланцюжок методів коротший і зручніший там, де потрібні власні comparer або Take. Тут GroupBy та ThenBy залишено методами, оскільки синтаксис `group ... by` і `orderby` не має параметра comparer: так збережено об’єднання «шт»/«ШТ», початкове написання ключа та другий ключ сортування без урахування регістру. Обидві форми повертають ті самі DTO, виконуються відкладено до ToList і коректно обробляють порожнє джерело.
 
 ### Відкладене виконання
 
 У `DeferredExecutionDemo.Run` виклик Where лише будує запит, а кожен Count() виконує його над поточним локальним списком. Перший Count() знаходить 3 дефіцитні позиції, а після додавання товару із залишком 3 другий знаходить 4. ToList() виконує запит і зберігає отримані елементи в окремому списку: після очищення джерела у знімку залишається 4 елементи. Це копія списку посилань, а не глибока копія Product; таблиці ReportService окремо проєктують значення в DTO.
-
