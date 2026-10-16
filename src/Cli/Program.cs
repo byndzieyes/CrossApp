@@ -4,9 +4,61 @@ using Core.Domain;
 using Core.Events;
 using Core.Abstractions;
 using Core.Services;
+using Core.Reports;
 using Cli;
 using Cli.Notifications;
 using System.Text.Json;
+
+if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("report-", StringComparison.Ordinal)))
+{
+    try
+    {
+        string[] storeArgs = Array.FindAll(args, a => a.StartsWith("--", StringComparison.Ordinal));
+        string[] commands = Array.FindAll(args, a => !a.StartsWith("--", StringComparison.Ordinal));
+        if (commands.Length > 1)
+            throw new ArgumentException("Передайте лише одну команду звіту.");
+
+        var service = new CatalogService(StoreFactory.Create(storeArgs));
+        string command = commands.FirstOrDefault() ?? "report-top";
+        var items = service.All();
+        switch (command)
+        {
+            case "report-top":
+                PrintStockLines(ReportService.TopByQuantity(items, 5));
+                break;
+            case "report-low":
+                PrintStockLines(ReportService.LowStock(items, 10));
+                break;
+            case "report-groups":
+                Console.WriteLine($"  {"Одиниця",-10} {"Позицій",8} {"Сумарно",10}");
+                foreach (var group in ReportService.ByUnit(items))
+                    Console.WriteLine($"  {group.Key,-10} {group.Count,8} {group.TotalQuantity,10}");
+                break;
+            case "report-sum":
+                var totals = ReportService.Totals(items);
+                Console.WriteLine($"Позицій: {totals.Items}, всього: {totals.Total}, " +
+                    $"середнє: {totals.Average:F2}, макс: {totals.Max}");
+                break;
+            case "report-demo":
+                var demo = DeferredExecutionDemo.Run(items);
+                Console.WriteLine($"Дефіцитних до змін: {demo.Before}");
+                Console.WriteLine($"Дефіцитних після додавання: {demo.After}");
+                Console.WriteLine($"Після очищення джерела: {demo.Remaining}");
+                Console.WriteLine($"У знімку лишилось: {demo.Snapshot}");
+                break;
+            default:
+                Console.WriteLine("Команди: report-top | report-low | report-groups | report-sum | report-demo");
+                return 1;
+        }
+        return 0;
+    }
+    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+        or JsonException or ArgumentException or InvalidOperationException)
+    {
+        Console.WriteLine($"Не вдалося сформувати звіт: {exception.Message}");
+        return 1;
+    }
+}
 
 if (args.Length == 1 && args[0] == "--demo-sinks")
 {
@@ -28,8 +80,9 @@ if (args.Length == 1 && args[0] == "--demo-sinks")
     }
 }
 
-if (StoreFactory.IsCatalogMode(args))
+if (Array.Exists(args, a => a == "--demo-catalog"))
 {
+    args = Array.FindAll(args, a => a != "--demo-catalog");
     // Composition root: фабрика створює сховище, а тут з’єднуємо його із сервісом.
     bool useFile = args.Contains("--file");
     ICatalogStore store = StoreFactory.Create(args);
@@ -53,7 +106,8 @@ if (StoreFactory.IsCatalogMode(args))
 
 if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
 {
-    Console.WriteLine("Використання: [--file] [--cache] | --demo-domain | --demo-sinks | шлях до CSV/JSON");
+    Console.WriteLine("Використання: [report-top|report-low|report-groups|report-sum|report-demo] [--file] [--cache]");
+    Console.WriteLine("Або: --demo-catalog [--file] [--cache] | --demo-domain | --demo-sinks | шлях до CSV/JSON");
     return 1;
 }
 
@@ -129,6 +183,15 @@ if (result.Errors.Count > 0)
 PrintStatistics(result);
 
 return 0;
+
+static void PrintStockLines(IReadOnlyList<StockLine> lines)
+{
+    Console.WriteLine($"  {"SKU",-10} {"Назва",-24} {"Залишок",8} Одиниця");
+    foreach (var line in lines)
+        Console.WriteLine($"  {line.Sku,-10} {line.Name,-24} {line.Quantity,8} {line.Unit}");
+    if (lines.Count == 0)
+        Console.WriteLine("  Немає позицій для звіту.");
+}
 
 static void RunCatalogDemo(CatalogService service, string storeName, string? dataPath)
 {
