@@ -5,6 +5,7 @@ using Core.Events;
 using Core.Abstractions;
 using Core.Services;
 using Core.Reports;
+using Core;
 using Cli;
 using Cli.Notifications;
 using System.Text.Json;
@@ -39,6 +40,13 @@ if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("re
                 Console.WriteLine($"Позицій: {totals.Items}, всього: {totals.Total}, " +
                     $"середнє: {totals.Average:F2}, макс: {totals.Max}");
                 break;
+            case "report-movements":
+                Console.WriteLine("Переміщення: демонстраційна вибірка SampleData, не журнал сховища.");
+                Console.WriteLine($"  {"SKU",-10} {"Назва",-24} {"Одиниця",-8} {"Рухів",6} {"Прихід",8} {"Видача",8} {"Зміна",8}");
+                foreach (var line in ReportService.ByMovements(items, SampleData.Movements()))
+                    Console.WriteLine($"  {line.Sku,-10} {line.Name,-24} {line.Unit,-8} " +
+                        $"{line.MovementCount,6} {line.Received,8} {line.Issued,8} {line.NetChange,8}");
+                break;
             case "report-demo":
                 var demo = DeferredExecutionDemo.Run(items);
                 Console.WriteLine($"Дефіцитних до змін: {demo.Before}");
@@ -47,7 +55,7 @@ if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("re
                 Console.WriteLine($"У знімку лишилось: {demo.Snapshot}");
                 break;
             default:
-                Console.WriteLine("Команди: report-top | report-low | report-groups | report-sum | report-demo");
+                Console.WriteLine("Команди: report-top | report-low | report-groups | report-sum | report-demo | report-movements");
                 return 1;
         }
         return 0;
@@ -106,7 +114,7 @@ if (Array.Exists(args, a => a == "--demo-catalog"))
 
 if (args.Length != 1 || (args[0].StartsWith("--") && args[0] != "--demo-domain"))
 {
-    Console.WriteLine("Використання: [report-top|report-low|report-groups|report-sum|report-demo] [--file] [--cache]");
+    Console.WriteLine("Використання: [report-top|report-low|report-groups|report-sum|report-demo|report-movements] [--file] [--cache]");
     Console.WriteLine("Або: --demo-catalog [--file] [--cache] | --demo-domain | --demo-sinks | шлях до CSV/JSON");
     return 1;
 }

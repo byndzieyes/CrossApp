@@ -4,6 +4,18 @@ namespace Core;
 
 public static class SampleData
 {
+    // Окрема навчальна вибірка
+    public static IEnumerable<StockMovement> Movements() =>
+    [
+        new("P-001", 50),
+        new("P-001", -20),
+        new("P-001", 10),
+        new("P-002", -2),
+        new("P-005", 30),
+        new("P-008", 1000),
+        new("P-008", -200)
+    ];
+
     // Кожен виклик створює нові сутності: зміни одного сховища не змінюють seed іншого.
     public static IEnumerable<Product> Products() =>
     [

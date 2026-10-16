@@ -4,6 +4,21 @@ namespace Core.Reports;
 
 public static class ReportService
 {
+    public static IReadOnlyList<MovementSummary> ByMovements(
+        IEnumerable<Product> products, IEnumerable<StockMovement> movements) =>
+        products.GroupJoin(movements,
+                product => product.Id,
+                movement => movement.ProductId,
+                (product, matches) => new MovementSummary(
+                    product.Sku, product.Name, product.Unit,
+                    matches.Count(),
+                    matches.Where(m => m.Delta > 0).Sum(m => m.Delta),
+                    matches.Where(m => m.Delta < 0).Sum(m => -m.Delta),
+                    matches.Sum(m => m.Delta)),
+                StringComparer.OrdinalIgnoreCase)
+            .OrderBy(line => line.Sku, StringComparer.Ordinal)
+            .ToList();
+
     public static IReadOnlyList<StockLine> LowStock(IEnumerable<Product> source, int threshold) =>
         source.Where(p => p.Quantity < threshold)
             .OrderBy(p => p.Quantity)
