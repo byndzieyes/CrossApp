@@ -1,4 +1,5 @@
 using Core.Domain;
+using Core.Extensions;
 
 namespace Core.Reports;
 
@@ -27,10 +28,14 @@ public static class ReportService
             .ToList();
 
     public static IReadOnlyList<StockLine> TopByQuantity(IEnumerable<Product> source, int n) =>
-        source.OrderByDescending(p => p.Quantity)
-            .ThenBy(p => p.Sku, StringComparer.Ordinal)
-            .Take(n)
+        source.TopBy(p => p.Quantity, n, p => p.Sku)
             .Select(p => new StockLine(p.Sku, p.Name, p.Quantity, p.Unit))
+            .ToList();
+
+    public static IReadOnlyList<MovementSummary> TopByMovementCount(
+        IEnumerable<Product> products, IEnumerable<StockMovement> movements, int n) =>
+        ByMovements(products, movements)
+            .TopBy(line => line.MovementCount, n, line => line.Sku)
             .ToList();
 
     public static IReadOnlyList<GroupSummary> ByUnit(IEnumerable<Product> source) =>
