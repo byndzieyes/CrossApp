@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Generated coverage runs (the measured snapshot is tests/coverage.cobertura.xml)
+/tests/coverage/
+!/tests/coverage.cobertura.xml
