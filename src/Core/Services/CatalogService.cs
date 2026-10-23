@@ -54,10 +54,8 @@ public sealed class CatalogService(
     {
         ct.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(importer);
-        var items = await importer.LoadAsync(path, ct);
-        ct.ThrowIfCancellationRequested();
         int added = 0;
-        foreach (var item in items)
+        await foreach (var item in importer.StreamAsync(path, ct).WithCancellation(ct))
         {
             ct.ThrowIfCancellationRequested();
             if (_store.GetById(item.Id) is not null) continue;

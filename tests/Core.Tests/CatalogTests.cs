@@ -111,7 +111,7 @@ public class CatalogTests
             var ex = await Assert.ThrowsAsync<DomainException>(() => service.ImportAsync(importer, path));
             Assert.Contains("Запис 2", ex.Message);
             Assert.IsType<ArgumentOutOfRangeException>(ex.InnerException);
-            Assert.Empty(service.All());
+            Assert.Single(service.All());
             await File.WriteAllTextAsync(path, "[{}]");
             Assert.Contains("поле 'id'", (await Assert.ThrowsAsync<DomainException>(() => importer.LoadAsync(path))).Message);
             await File.WriteAllTextAsync(path, "null");
@@ -123,6 +123,52 @@ public class CatalogTests
         await Assert.ThrowsAsync<FileNotFoundException>(() => importer.LoadAsync(path));
     }
 
+    [Fact(DisplayName = "Потоковий імпорт: сервіс додає товар до запиту наступного елемента")]
+    public async Task StreamingImport_ProcessesEachItemBeforeRequestingNext()
+    {
+        var service = new CatalogService(new InMemoryCatalogStore());
+        var importer = new OrderedImporter(service);
+        Assert.Equal(2, await service.ImportAsync(importer, "unused"));
+        Assert.Equal(2, service.All().Count);
+    }
+
+    [Fact(DisplayName = "Потоковий JSON: перший товар доступний до помилки другого, перебирання звільняє файл")]
+    public async Task JsonStream_YieldsBeforeValidationErrorAndDisposesFile()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"lab08-stream-{Guid.NewGuid():N}.json");
+        try
+        {
+            await File.WriteAllTextAsync(path,
+                """[{"id":"a","sku":"A","name":"Товар","unit":"шт","quantity":2},{}]""");
+            await using (var iterator = new JsonCatalogImporter().StreamAsync(path).GetAsyncEnumerator())
+            {
+                Assert.True(await iterator.MoveNextAsync());
+                Assert.Equal("a", iterator.Current.Id);
+                var error = await Assert.ThrowsAsync<DomainException>(async () => await iterator.MoveNextAsync());
+                Assert.Contains("Запис 2", error.Message);
+            }
+            using var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            Assert.True(exclusive.CanWrite);
+        }
+        finally { File.Delete(path); }
+    }
+
+    private sealed class OrderedImporter(CatalogService service) : ICatalogImporter
+    {
+        public Task<IReadOnlyList<Product>> LoadAsync(string path, CancellationToken ct = default) =>
+            throw new InvalidOperationException("Сервіс повинен використовувати потоковий контракт.");
+
+        public async IAsyncEnumerable<Product> StreamAsync(string path,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            ct.ThrowIfCancellationRequested();
+            yield return Items()[0];
+            Assert.NotNull(service.Find("a"));
+            yield return Items()[1];
+        }
+    }
+
     private sealed class StubImporter : ICatalogImporter
     {
         public CancellationToken Token { get; private set; }
@@ -130,6 +176,18 @@ public class CatalogTests
         {
             Token = ct;
             return Task.FromResult<IReadOnlyList<Product>>(Items());
+        }
+
+        public async IAsyncEnumerable<Product> StreamAsync(string path,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            Token = ct;
+            await Task.CompletedTask;
+            foreach (var item in Items())
+            {
+                ct.ThrowIfCancellationRequested();
+                yield return item;
+            }
         }
     }
 }
