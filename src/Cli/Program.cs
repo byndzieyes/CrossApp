@@ -13,8 +13,10 @@ using Core.Storage;
 
 if (args.FirstOrDefault() == "import")
 {
-    using var cts = new CancellationTokenSource();
-    ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cts.Cancel(); };
+    using var userCts = new CancellationTokenSource();
+    using var timeoutCts = new CancellationTokenSource();
+    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
+    ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; userCts.Cancel(); };
     Console.CancelKeyPress += cancel;
     try
     {
@@ -26,19 +28,26 @@ if (args.FirstOrDefault() == "import")
             {
                 if (!int.TryParse(option[13..], out int ms) || ms < 0)
                     throw new ArgumentException("Таймаут має бути невід'ємним цілим числом мілісекунд.");
-                if (ms == 0) cts.Cancel();
-                else cts.CancelAfter(ms);
+                if (ms == 0) timeoutCts.Cancel();
+                else timeoutCts.CancelAfter(ms);
             }
             else storeFlags.Add(option);
         }
         ICatalogStore store = storeFlags.Count == 0
             ? new InMemoryCatalogStore() : StoreFactory.Create(storeFlags.ToArray());
         var service = new CatalogService(store);
-        int added = await service.ImportAsync(new JsonCatalogImporter(), args[1], cts.Token);
+        int added = await service.ImportAsync(new JsonCatalogImporter(), args[1], linkedCts.Token);
         Console.WriteLine($"Імпортовано записів: {added}");
         return 0;
     }
-    catch (OperationCanceledException) { Console.WriteLine("Імпорт скасовано."); return 2; }
+    catch (OperationCanceledException) when (userCts.IsCancellationRequested || timeoutCts.IsCancellationRequested)
+    {
+        Console.WriteLine("Імпорт скасовано.");
+        Console.WriteLine(userCts.IsCancellationRequested
+            ? "Причина: запит користувача (Ctrl+C)."
+            : "Причина: вичерпано час очікування.");
+        return 2;
+    }
     catch (DomainException ex) { Console.WriteLine($"Дані відхилено: {ex.Message}"); return 1; }
     catch (FileNotFoundException ex) { Console.WriteLine($"Файл не знайдено: {ex.FileName}"); return 1; }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)

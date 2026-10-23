@@ -153,6 +153,61 @@ public class CatalogTests
         finally { File.Delete(path); }
     }
 
+    [Theory(DisplayName = "Зв’язані токени: імпорт скасовується лише активованим джерелом")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task LinkedCancellation_IdentifiesTimeoutOrUser(bool useTimeout)
+    {
+        using var userCts = new CancellationTokenSource();
+        using var timeoutCts = new CancellationTokenSource();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(userCts.Token, timeoutCts.Token);
+        var importer = new WaitingImporter();
+        var service = new CatalogService(new InMemoryCatalogStore());
+        Task<int> operation = service.ImportAsync(importer, "unused", linkedCts.Token);
+        try
+        {
+            await importer.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (useTimeout) timeoutCts.CancelAfter(TimeSpan.FromMilliseconds(50));
+            else userCts.Cancel();
+
+            var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => operation.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Equal(linkedCts.Token, error.CancellationToken);
+            Assert.True(linkedCts.IsCancellationRequested);
+            Assert.Equal(useTimeout, timeoutCts.IsCancellationRequested);
+            Assert.Equal(!useTimeout, userCts.IsCancellationRequested);
+            Assert.Empty(service.All());
+            Assert.True(importer.Disposed);
+        }
+        finally
+        {
+            userCts.Cancel();
+            try { await operation.WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch (OperationCanceledException) { }
+        }
+    }
+
+    private sealed class WaitingImporter : ICatalogImporter
+    {
+        public TaskCompletionSource<bool> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool Disposed { get; private set; }
+
+        public Task<IReadOnlyList<Product>> LoadAsync(string path, CancellationToken ct = default) =>
+            throw new InvalidOperationException("Використовується потоковий контракт.");
+
+        public async IAsyncEnumerable<Product> StreamAsync(string path,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            try
+            {
+                Started.SetResult(true);
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+                yield break;
+            }
+            finally { Disposed = true; }
+        }
+    }
+
     private sealed class OrderedImporter(CatalogService service) : ICatalogImporter
     {
         public Task<IReadOnlyList<Product>> LoadAsync(string path, CancellationToken ct = default) =>
