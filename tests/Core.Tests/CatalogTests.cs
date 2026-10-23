@@ -187,6 +187,60 @@ public class CatalogTests
         }
     }
 
+    [Theory(DisplayName = "Прогрес імпорту: 100% означає лише успішне завершення, значення не зменшуються")]
+    [InlineData("valid")]
+    [InlineData("empty")]
+    [InlineData("invalid")]
+    [InlineData("cancelled")]
+    public async Task ImportProgress_ReportsCompletionOnlyOnSuccess(string scenario)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"lab08-progress-{Guid.NewGuid():N}.json");
+        const string good = """{"id":"progress-1","sku":"SKU","name":"Товар","unit":"шт","quantity":2}""";
+        var progress = new RecordingProgress();
+        using var cts = new CancellationTokenSource();
+        var service = new CatalogService(new InMemoryCatalogStore());
+        try
+        {
+            string json = scenario switch
+            {
+                "empty" => "[]",
+                "invalid" => $"[{good},{{}}]",
+                _ => $"[{good}]"
+            };
+            await File.WriteAllTextAsync(path, json);
+            if (scenario == "cancelled") service.Changed += (_, _) => cts.Cancel();
+            Task<int> operation = service.ImportAsync(new JsonCatalogImporter(), path, cts.Token, progress);
+            if (scenario == "invalid")
+                await Assert.ThrowsAsync<DomainException>(() => operation);
+            else if (scenario == "cancelled")
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+            else
+                Assert.Equal(scenario == "empty" ? 0 : 1, await operation);
+
+            Assert.Equal(0, progress.Values[0]);
+            Assert.All(progress.Values, value => Assert.InRange(value, 0, 100));
+            Assert.Equal(progress.Values.OrderBy(value => value), progress.Values);
+            if (scenario is "valid" or "empty")
+                Assert.Equal(100, progress.Values[^1]);
+            else
+                Assert.DoesNotContain(100, progress.Values);
+            if (scenario == "valid")
+            {
+                Assert.Contains(progress.Values, value => value > 0 && value < 100);
+                var repeated = new RecordingProgress();
+                Assert.Equal(0, await service.ImportAsync(new JsonCatalogImporter(), path, progress: repeated));
+                Assert.Equal(100, repeated.Values[^1]);
+            }
+        }
+        finally { File.Delete(path); }
+    }
+
+    private sealed class RecordingProgress : IProgress<int>
+    {
+        public List<int> Values { get; } = [];
+        public void Report(int value) => Values.Add(value);
+    }
+
     private sealed class WaitingImporter : ICatalogImporter
     {
         public TaskCompletionSource<bool> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -196,7 +250,7 @@ public class CatalogTests
             throw new InvalidOperationException("Використовується потоковий контракт.");
 
         public async IAsyncEnumerable<Product> StreamAsync(string path,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IProgress<int>? progress = null)
         {
             try
             {
@@ -214,7 +268,7 @@ public class CatalogTests
             throw new InvalidOperationException("Сервіс повинен використовувати потоковий контракт.");
 
         public async IAsyncEnumerable<Product> StreamAsync(string path,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IProgress<int>? progress = null)
         {
             await Task.CompletedTask;
             ct.ThrowIfCancellationRequested();
@@ -234,7 +288,7 @@ public class CatalogTests
         }
 
         public async IAsyncEnumerable<Product> StreamAsync(string path,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default, IProgress<int>? progress = null)
         {
             Token = ct;
             await Task.CompletedTask;

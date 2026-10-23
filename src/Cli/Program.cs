@@ -36,7 +36,8 @@ if (args.FirstOrDefault() == "import")
         ICatalogStore store = storeFlags.Count == 0
             ? new InMemoryCatalogStore() : StoreFactory.Create(storeFlags.ToArray());
         var service = new CatalogService(store);
-        int added = await service.ImportAsync(new JsonCatalogImporter(), args[1], linkedCts.Token);
+        int added = await service.ImportAsync(new JsonCatalogImporter(), args[1], linkedCts.Token,
+            new ConsoleImportProgress());
         Console.WriteLine($"Імпортовано записів: {added}");
         return 0;
     }

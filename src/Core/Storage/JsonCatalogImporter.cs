@@ -19,7 +19,8 @@ public sealed class JsonCatalogImporter : ICatalogImporter
     }
 
     public async IAsyncEnumerable<Product> StreamAsync(
-        string path, [EnumeratorCancellation] CancellationToken ct = default)
+        string path, [EnumeratorCancellation] CancellationToken ct = default,
+        IProgress<int>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -42,6 +43,7 @@ public sealed class JsonCatalogImporter : ICatalogImporter
         }
         stream.Position = 0;
         int number = 0;
+        int lastPercent = 0;
         await foreach (var element in JsonSerializer.DeserializeAsyncEnumerable<JsonElement>(
             stream, Options, cancellationToken: ct))
         {
@@ -62,6 +64,13 @@ public sealed class JsonCatalogImporter : ICatalogImporter
                 throw new DomainException($"Запис {number}: {ex.Message}", ex);
             }
             yield return product;
+            ct.ThrowIfCancellationRequested();
+            int percent = (int)Math.Min(99, stream.Position * 100d / stream.Length);
+            if (percent > lastPercent)
+            {
+                progress?.Report(percent);
+                lastPercent = percent;
+            }
         }
     }
 }

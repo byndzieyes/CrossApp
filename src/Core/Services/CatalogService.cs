@@ -50,12 +50,14 @@ public sealed class CatalogService(
 
     public IReadOnlyList<Product> All() => _store.List();
 
-    public async Task<int> ImportAsync(ICatalogImporter importer, string path, CancellationToken ct = default)
+    public async Task<int> ImportAsync(ICatalogImporter importer, string path, CancellationToken ct = default,
+        IProgress<int>? progress = null)
     {
         ct.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(importer);
+        progress?.Report(0);
         int added = 0;
-        await foreach (var item in importer.StreamAsync(path, ct).WithCancellation(ct))
+        await foreach (var item in importer.StreamAsync(path, ct, progress).WithCancellation(ct))
         {
             ct.ThrowIfCancellationRequested();
             if (_store.GetById(item.Id) is not null) continue;
@@ -63,6 +65,8 @@ public sealed class CatalogService(
             OnChanged(item, CatalogChangeKind.Added, item.Quantity);
             added++;
         }
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(100);
         return added;
     }
 
