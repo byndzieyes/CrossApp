@@ -9,6 +9,42 @@ using Core;
 using Cli;
 using Cli.Notifications;
 using System.Text.Json;
+using Core.Storage;
+
+if (args.FirstOrDefault() == "import")
+{
+    using var cts = new CancellationTokenSource();
+    ConsoleCancelEventHandler cancel = (_, e) => { e.Cancel = true; cts.Cancel(); };
+    Console.CancelKeyPress += cancel;
+    try
+    {
+        if (args.Length < 2) throw new ArgumentException("Використання: import <JSON> [--file] [--cache] [--timeout-ms=N]");
+        var storeFlags = new List<string>();
+        foreach (string option in args.Skip(2))
+        {
+            if (option.StartsWith("--timeout-ms=", StringComparison.Ordinal))
+            {
+                if (!int.TryParse(option[13..], out int ms) || ms < 0)
+                    throw new ArgumentException("Таймаут має бути невід'ємним цілим числом мілісекунд.");
+                if (ms == 0) cts.Cancel();
+                else cts.CancelAfter(ms);
+            }
+            else storeFlags.Add(option);
+        }
+        ICatalogStore store = storeFlags.Count == 0
+            ? new InMemoryCatalogStore() : StoreFactory.Create(storeFlags.ToArray());
+        var service = new CatalogService(store);
+        int added = await service.ImportAsync(new JsonCatalogImporter(), args[1], cts.Token);
+        Console.WriteLine($"Імпортовано записів: {added}");
+        return 0;
+    }
+    catch (OperationCanceledException) { Console.WriteLine("Імпорт скасовано."); return 2; }
+    catch (DomainException ex) { Console.WriteLine($"Дані відхилено: {ex.Message}"); return 1; }
+    catch (FileNotFoundException ex) { Console.WriteLine($"Файл не знайдено: {ex.FileName}"); return 1; }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+    { Console.WriteLine($"Не вдалося виконати імпорт: {ex.Message}"); return 1; }
+    finally { Console.CancelKeyPress -= cancel; }
+}
 
 if (args.Length == 1 && args[0] == "report-benchmark")
 {
@@ -81,7 +117,7 @@ if (StoreFactory.IsCatalogMode(args) || Array.Exists(args, a => a.StartsWith("re
         return 0;
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-        or JsonException or ArgumentException or InvalidOperationException)
+        or JsonException or ArgumentException or InvalidOperationException or DomainException)
     {
         Console.WriteLine($"Не вдалося сформувати звіт: {exception.Message}");
         return 1;
@@ -101,7 +137,7 @@ if (args.Length == 1 && args[0] == "--demo-sinks")
         return 0;
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-        or ArgumentException or InvalidOperationException)
+        or ArgumentException or InvalidOperationException or DomainException)
     {
         Console.WriteLine($"Не вдалося виконати демо з INotificationSink: {exception.Message}");
         return 1;
@@ -125,7 +161,7 @@ if (Array.Exists(args, a => a == "--demo-catalog"))
         return 0;
     }
     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-        or JsonException or ArgumentException or InvalidOperationException)
+        or JsonException or ArgumentException or InvalidOperationException or DomainException)
     {
         Console.WriteLine($"Не вдалося виконати операцію каталогу: {exception.Message}");
         return 1;

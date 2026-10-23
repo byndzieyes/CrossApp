@@ -50,6 +50,24 @@ public sealed class CatalogService(
 
     public IReadOnlyList<Product> All() => _store.List();
 
+    public async Task<int> ImportAsync(ICatalogImporter importer, string path, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(importer);
+        var items = await importer.LoadAsync(path, ct);
+        ct.ThrowIfCancellationRequested();
+        int added = 0;
+        foreach (var item in items)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_store.GetById(item.Id) is not null) continue;
+            _store.Add(item);
+            OnChanged(item, CatalogChangeKind.Added, item.Quantity);
+            added++;
+        }
+        return added;
+    }
+
     public Product? Find(string id) => _store.GetById(id);
 
     public IReadOnlyList<Product> Search(Func<Product, bool> predicate)
@@ -59,5 +77,5 @@ public sealed class CatalogService(
     }
 
     private Product RequireProduct(string id) => _store.GetById(id)
-        ?? throw new InvalidOperationException($"Немає товару з id={id}.");
+        ?? throw new DomainException($"Немає товару з id={id}.");
 }

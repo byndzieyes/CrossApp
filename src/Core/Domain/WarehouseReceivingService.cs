@@ -12,15 +12,15 @@ public sealed class WarehouseReceivingService
                 "Кількість надходження має бути більшою за нуль");
 
         if (!string.Equals(warehouse.Unit, product.Unit, StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"Склад {warehouse.Name} приймає {warehouse.Unit}, а товар {product.Sku} має одиницю {product.Unit}");
 
         if (amount > warehouse.FreeCapacity)
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"На складі {warehouse.Name} вільно лише {warehouse.FreeCapacity} {warehouse.Unit}");
 
         if (amount > int.MaxValue - product.Quantity)
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"Надходження переповнить залишок товару {product.Sku}");
 
         product.RegisterArrival(amount);

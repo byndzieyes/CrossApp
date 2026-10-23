@@ -50,7 +50,7 @@ public sealed class Warehouse
                 "Кількість надходження має бути більшою за нуль");
 
         if (amount > FreeCapacity)
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"На складі {Name} вільно лише {FreeCapacity} {Unit}");
 
         _occupiedCapacity += amount;

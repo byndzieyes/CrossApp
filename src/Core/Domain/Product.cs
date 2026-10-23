@@ -69,7 +69,7 @@ public sealed class Product
                 nameof(amount), amount, "Кількість приходу має бути більшою за нуль");
 
         if (amount > int.MaxValue - _quantity)
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"Не можна додати {amount} одиниць товару {Sku}: залишок перевищить допустиме значення");
 
         _quantity += amount;
@@ -82,7 +82,7 @@ public sealed class Product
                 nameof(amount), amount, "Кількість видачі має бути більшою за нуль");
 
         if (amount > _quantity)
-            throw new InvalidOperationException(
+            throw new DomainException(
                 $"Не можна видати {amount} одиниць товару {Sku}: залишок становить {_quantity}");
 
         _quantity -= amount;

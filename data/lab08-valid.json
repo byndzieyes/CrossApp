@@ -1,0 +1,4 @@
+[
+  { "id": "lab08-1", "sku": "LAB08-A", "name": "Кабель", "unit": "м", "quantity": 10 },
+  { "id": "lab08-2", "sku": "LAB08-B", "name": "Болт", "unit": "шт", "quantity": 5 }
+]

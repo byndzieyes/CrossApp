@@ -25,7 +25,7 @@ public sealed class Order
         {
             (OrderStatus.Draft, OrderStatus.Confirmed) => OrderStatus.Confirmed,
             (OrderStatus.Draft, OrderStatus.Cancelled) => OrderStatus.Cancelled,
-            _ => throw new InvalidOperationException(
+            _ => throw new DomainException(
                 $"Перехід замовлення {Id} зі стану {Status} до {nextStatus} заборонено")
         };
     }
